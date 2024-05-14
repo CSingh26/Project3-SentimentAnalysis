@@ -1,12 +1,15 @@
 #imports 
 import pandas as pd
 import numpy as np
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import nltk
 import ssl
 import re
 from nltk.stem import WordNetLemmatizer
 from sklearn.feature_extraction.text import TfidfVectorizer
+from wordcloud import WordCloud, STOPWORDS
+from nltk import pos_tag
+swords = set(STOPWORDS)
 
 #downloading nltk packages
 try:
@@ -33,7 +36,7 @@ data.columns = data.columns.str.strip()
 print(data.columns)
 
 #identifyin different polarities
-print(data['polarity of tweet'].value_counts())
+print(data['polarity of tweetï¿½'].value_counts())
 
 #removing unwanted columns
 data.drop(columns=['user', 'query', 'date of the tweet', 'id of the tweet'], inplace=True)
@@ -81,3 +84,57 @@ lem = WordNetLemmatizer()
 
 data['pre-processed-data'] = data['pre-processed-data'].apply(lambda
                             x: lem.lemmatize(x) if isinstance(x, str) else x)
+
+#EDA on pre-processed dataset
+
+#polarity distribution
+plt.pie(data['polarity of tweetï¿½'].value_counts(), labels=['negative', 'positive'])
+plt.show()
+
+#word-cloud
+def show_wordcloud(data):
+    wordcloud = WordCloud(
+        background_color='white',
+        stopwords=swords,
+        max_words=100,
+        max_font_size=30,
+        scale=3,
+        random_state=1)
+
+    wordcloud=wordcloud.generate(str(data))
+
+    fig = plt.figure(1, figsize=(12, 12))
+    plt.axis('off')
+
+    plt.imshow(wordcloud)
+    plt.show()
+
+show_wordcloud(data['pre-processed-data'])
+
+freq = {}
+for doc in data['pre-processed-data']:
+    for word in doc:
+        freq[word] = freq.get(word, 0) + 1
+
+plt.figure(figsize=(10,6))
+plt.hist(freq.values(), bins=50, color='orange')
+plt.title('Histogram of Word Frequencies')
+plt.xlabel('Word Frequency')
+plt.ylabel('Number of Words')
+plt.show()
+
+#pos_tagging
+def posTag(tokens):
+    tagWords = pos_tag(tokens)
+    return tagWords
+
+data['pos-tags'] = data['pre-processed-data'].apply(posTag)
+tags = [tag for tags in data['pos-tags'] for _, tag in tags]
+tagDis = nltk.FreqDist(tags)
+
+plt.figure(figsize=(10,6))
+tagDis.plot(cumulative=False)
+plt.title('Distribution of POS Tag')
+plt.xlabel('Pos Tag')
+plt.ylabel('Frequency')
+plt.show()
