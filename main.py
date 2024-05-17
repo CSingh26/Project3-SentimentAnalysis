@@ -2,19 +2,24 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import nltk
+import string
 import ssl
 import re
 from nltk.stem import WordNetLemmatizer
-from sklearn.feature_extraction.text import TfidfVectorizer
+from nltk.tokenize import word_tokenize
 from wordcloud import WordCloud, STOPWORDS
-from nltk import pos_tag
 from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+import seaborn as sns
+from nltk.probability import FreqDist
 
 from keras._tf_keras.keras.models import Sequential
-from keras._tf_keras.keras.layers import LSTM, Dense, Embedding, SimpleRNN
-from keras._tf_keras.keras.preprocessing.sequence import pad_sequences
-from keras._tf_keras.keras.preprocessing.text import Tokenizer
+from keras._tf_keras.keras.layers import Dense
+from keras._tf_keras.keras.optimizers import Adam, RMSprop
+
+import warnings
+warnings.filterwarnings('ignore')
 
 swords = set(STOPWORDS)
 
@@ -26,184 +31,164 @@ except AttributeError:
 else:
     ssl._create_default_https_context = _create_unverified_https_context
 
-nltk.download('stopwords')
-nltk.download("wordnet")
-nltk.download("omw-1.4")
+# nltk.download('stopwords')
+# nltk.download("wordnet")
+# nltk.download("omw-1.4")
 
 from nltk.corpus import stopwords
 
-#loading the data
-data = pd.read_csv('data/data.csv', encoding='iso-8859-1')
-
-#viewing the data
-# print(data.head())
-# print(data.info())
-
-data.columns = data.columns.str.strip()
-print(data.columns)
-
-#identifyin different polarities
-# print(data['polarity of tweetï¿½'].value_counts())
-
-#removing unwanted columns
-data.drop(columns=['user', 'query', 'date of the tweet', 'id of the tweet'], inplace=True)
-# print(data.head())
-
-#Data Pre-prcocessing
-
-#lowercasing 
-data['pre-processed-data'] = data['text of the tweetï¿½'].apply(lambda
-                            x: x.lower() if isinstance(x, str) else x)
-
-#removing puncuation marks and special characters
-punch = r'[^\w\s]'
-
-data['pre-processed-data'] = data['pre-processed-data'].apply(lambda
-                            x: re.sub(punch, '', x) if isinstance(x, str) else x)
-
-#removing urls (if present)
-def removeURL(text):
-    url_pattern = re.compile(r'https?://\S+|www\.\S+')
-    return url_pattern.sub(r'', text)
-
-data['pre-processed-data'] = data['pre-processed-data'].apply(lambda
-                            x: removeURL(x) if isinstance(x, str) else x)
-
-#removing stop-words
-def stepWordRemoval(text):
-    nltk
-    stwd = set(stopwords.words("english"))
-    wdtkns = text.split()
-    fil = [word for word in wdtkns if word not in stwd]
-    return ' '.join(fil)
-
-data['pre-processed-data'] = data['pre-processed-data'].apply(lambda
-                            x: stepWordRemoval(x) if isinstance(x, str) else x)
-
-#tokenization
-vec = TfidfVectorizer()
-tknMatix = vec.fit_transform(data['pre-processed-data'].values.astype('U'))
-
-data['pre-processed-data'] = vec.inverse_transform(tknMatix)
-
-#lemmatization
-lem = WordNetLemmatizer()
-
-data['pre-processed-data'] = data['pre-processed-data'].apply(lambda
-                            x: lem.lemmatize(x) if isinstance(x, str) else x)
-
-#TODO Model-Selection
 #TODO Hyperparameter-Tuning
 #TODO Cross-validation
 #TODO Model-Interpretability
 #TODO Evaluation-Metrics
 
-#EDA on pre-processed dataset
+#loading trainData
 
-#polarity distribution
-# plt.pie(data['polarity of tweetï¿½'].value_counts(), labels=['negative', 'positive'])
-# plt.show()
+#train-trainData
+trainData = pd.read_csv('data/train.csv', encoding='latin1')
 
-# #word-cloud
-# def show_wordcloud(data):
-#     wordcloud = WordCloud(
-#         background_color='white',
-#         stopwords=swords,
-#         max_words=100,
-#         max_font_size=30,
-#         scale=3,
-#         random_state=1)
+#test-trainData
+testData = pd.read_csv('data/test.csv', encoding='latin1')
 
-#     wordcloud=wordcloud.generate(str(data))
+#cleaning data
+trainData.drop(columns=['textID','Time of Tweet', 'Age of User', 'Country', 
+                        'Population -2020', 'Land Area (Km²)', 
+                        'Density (P/Km²)'], inplace=True)
 
-#     fig = plt.figure(1, figsize=(12, 12))
-#     plt.axis('off')
+testData.drop(columns=['textID','Time of Tweet', 'Age of User', 'Country', 
+                        'Population -2020', 'Land Area (Km²)', 
+                        'Density (P/Km²)'], inplace=True)
 
-#     plt.imshow(wordcloud)
-#     plt.show()
+# Pre-processing function
+def preprocessText(text):
+    if not isinstance(text, str):
+        return text
+    
+    #lowercasing
+    text = text.lower()
+    
+    #removing special characters and punctuations
+    text = re.sub(r'[^\w\s]', '', text)
+    
+    #removing URLs
+    text = re.sub(r'https?://\S+|www\.\S+', '', text)
+    
+    # Removing stop-words
+    stop_words = set(stopwords.words("english"))
+    text = ' '.join([word for word in text.split() if word not in stop_words])
+    
+    #tokenization
+    tokens = word_tokenize(text)
+    
+    #lemmatization
+    lemmatizer = WordNetLemmatizer()
+    tokens = [lemmatizer.lemmatize(token) for token in tokens]
+    
+    return ' '.join(tokens)
 
-# show_wordcloud(data['pre-processed-data'])
+#pre-processing individual datasets 
+trainData['cleanText'] = trainData['text'].apply(preprocessText)
+testData['cleanText'] = testData['text'].apply(preprocessText)
 
-# freq = {}
-# for doc in data['pre-processed-data']:
-#     for word in doc:
-#         freq[word] = freq.get(word, 0) + 1
+#combing and pre-processing datasets
+data = pd.concat([trainData, testData])
+data.dropna(subset=['text', 'sentiment'], inplace=True)
+data['cleanText'] = data['text'].apply(preprocessText)
+data['selected_text'] = data['selected_text'].apply(preprocessText)
+data.dropna(subset=['cleanText'], inplace=True)
 
-# plt.figure(figsize=(10,6))
-# plt.hist(freq.values(), bins=50, color='orange')
-# plt.title('Histogram of Word Frequencies')
-# plt.xlabel('Word Frequency')
-# plt.ylabel('Number of Words')
-# plt.show()
+#EDA (train data only)
 
-# #pos_tagging
-# def posTag(tokens):
-#     tagWords = pos_tag(tokens)
-#     return tagWords
+#sentiment value counts
+sentimentCounts = trainData['sentiment'].value_counts(normalize=True)
 
-# data['pos-tags'] = data['pre-processed-data'].apply(posTag)
-# tags = [tag for tags in data['pos-tags'] for _, tag in tags]
-# tagDis = nltk.FreqDist(tags)
+plt.figure(figsize=(10, 6))
+plt.bar(sentimentCounts.index, sentimentCounts.values)
+plt.xlabel('Sentiment')
+plt.ylabel('Proportion')
+plt.show()
 
-# plt.figure(figsize=(10,6))
-# tagDis.plot(cumulative=False)
-# plt.title('Distribution of POS Tag')
-# plt.xlabel('Pos Tag')
-# plt.ylabel('Frequency')
-# plt.show()
+#Sentiment Histplot
+sns.histplot(trainData['sentiment'], kde=True, color='c')
+plt.show()
 
-#model-selection
+#Word Frequency Distribution
+wordFreq = FreqDist(word_tokenize(' '.join(trainData['sentiment'])))
+plt.figure(figsize=(10, 6))
+wordFreq.plot(20, cumulative=False)
+plt.title("Word Frequency Distribution")
+plt.xlabel('Word')
+plt.ylabel('Frequency')
+plt.show()
 
-texts = data['pre-processed-data'].apply(lambda x: str(x))
+#WordCloud
+text_data = ' '.join(trainData['cleanText'].dropna().astype(str))
+wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text_data)
 
-#LSTM
-# Test Loss: -1771.4959716796875
-# Test Accuracy: 0.5195925831794739
+plt.figure(figsize=(10, 5))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off') 
+plt.title('Word Cloud for Training Data')
+plt.show()
+
+#Model-Selection
+
+X = data['cleanText']
+y = data['sentiment']
+
+#Spliting Data
+XTrain, XTest, yTrain, yTest = train_test_split(X, y, test_size=0.2, random_state=42)
+
+#TF-IDF
+vec = TfidfVectorizer(max_features=5000)
+XVTrain = vec.fit_transform(XTrain)
+XVTest = vec.transform(XTest)
+
+score = data['sentiment'].value_counts(normalize=True).max()
+print(score)
+
+yTrainEnc = pd.get_dummies(yTrain).values
+yTestEnc = pd.get_dummies(yTest).values
+
+#Dense NN model with Adam Optimizer
 # model = Sequential()
-# tokenizer = Tokenizer()
+# model.add(Dense(128, input_dim=XVTrain.shape[1], activation='relu'))
+# model.add(Dense(64, activation='relu'))
+# model.add(Dense(yTrainEnc.shape[1], activation='softmax'))
 
-# tokenizer.fit_on_texts(texts)
-# seq = tokenizer.texts_to_sequences(texts)
-# maxSeq = 100
-# paddedSeq = pad_sequences(seq, maxSeq)
+# opt = Adam(learning_rate=0.0001)
+# model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
 
-# model.add(Embedding((len(tokenizer.word_index)+1), 100, input_length=maxSeq))
-# model.add(LSTM(128))
-# model.add(Dense(1, activation='sigmoid'))
+# history = model.fit(XVTrain.toarray(), yTrainEnc, epochs=20, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
 
-# model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+# loss, accuracy = model.evaluate(XVTest.toarray(), yTestEnc, verbose=1)
+# print(f'Test Accuracy: {accuracy:.4f}')
+# print(f'Test Loss: {loss:.4f}')
 
-# XTrain, XTest, yTrain, yTest = train_test_split(paddedSeq, data['polarity of tweetï¿½'], test_size=0.35, random_state=42)
-# history = model.fit(XTrain, yTrain, epochs=5, batch_size=50, validation_split=0.3)
-
-# loss, accuracy = model.evaluate(XTest, yTest)
-# print(f'Test Loss: {loss}')
-# print(f'Test Accuracy: {accuracy}')
-
-#Simple RNN
-# Test Loss: 0.20048177242279053
-# Test Accuracy: 0.0
+#Dense NN model with RMSprop Optimizer
 model = Sequential()
-tokenizer = Tokenizer() 
+model.add(Dense(128, input_dim=XVTrain.shape[1], activation='relu'))
+model.add(Dense(64, activation='relu'))
+model.add(Dense(yTrainEnc.shape[1], activation='softmax'))
 
-tokenizer.fit_on_texts(texts)
-seq = tokenizer.texts_to_sequences(texts)
-maxSeq = 100
-paddedSeq = pad_sequences(seq, maxlen=maxSeq, padding='post')
+opt = RMSprop(learning_rate=0.0001)
+model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
 
-vocabSize = len(tokenizer.word_index) + 1
+history = model.fit(XVTrain.toarray(), yTrainEnc, epochs=15, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
 
-model.add(Embedding(input_dim=vocabSize, output_dim=100, input_length=maxSeq))
-model.add(SimpleRNN(128, return_sequences=True))
-model.add(SimpleRNN(64))
-model.add(Dense(1, activation='sigmoid'))
+loss, accuracy = model.evaluate(XVTest.toarray(), yTestEnc, verbose=1)
+print(f'Test Accuracy: {accuracy:.4f}')
+print(f'Test Loss: {loss:.4f}')
 
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+#Stats for Adam Optimizer Model 
+# Test Accuracy: 0.6357
+# Test Loss: 2.1005
 
-XTrain, XTest, yTrain, yTest = train_test_split(paddedSeq, data['polarity of tweetï¿½'], train_size=0.35, random_state=42)
+#Stats for RMSprop Optimizer Model
+# Test Accuracy: 0.7116
+# Test Loss: 0.8713
 
-history = model.fit(XTrain, yTrain, epochs=5, batch_size=32, validation_split=0.3)
-
-loss, accuracy = model.evaluate(XTest, yTest)
-print(f'Test Loss: {loss}')
-print(f'Test Accuracy: {accuracy}')
+#Going Forward with the RMSprop Optimizer Model because of 
+#1 Less Training Time (24s/step)
+#2 Higher Accuracy
+#3 Lower Loss
