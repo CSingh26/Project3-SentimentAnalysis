@@ -13,9 +13,20 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import seaborn as sns
 from nltk.probability import FreqDist
 
+import tensorflow as tf
+
 from keras._tf_keras.keras.models import Sequential
 from keras._tf_keras.keras.layers import Dense
 from keras._tf_keras.keras.optimizers import Adam, RMSprop, SGD
+from keras._tf_keras.keras.utils import to_categorical
+
+from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score
+
+import lime
+import lime.lime_text
+from sklearn.pipeline import make_pipeline
 
 import keras_tuner as kt
 
@@ -38,8 +49,6 @@ else:
 
 from nltk.corpus import stopwords
 
-#TODO Cross-validation
-#TODO Model-Interpretability
 #TODO Evaluation-Metrics
 
 #loading trainData
@@ -100,36 +109,36 @@ data.dropna(subset=['cleanText'], inplace=True)
 #EDA (train data only)
 
 #sentiment value counts
-sentimentCounts = trainData['sentiment'].value_counts(normalize=True)
+# sentimentCounts = trainData['sentiment'].value_counts(normalize=True)
 
-plt.figure(figsize=(10, 6))
-plt.bar(sentimentCounts.index, sentimentCounts.values)
-plt.xlabel('Sentiment')
-plt.ylabel('Proportion')
-plt.show()
+# plt.figure(figsize=(10, 6))
+# plt.bar(sentimentCounts.index, sentimentCounts.values)
+# plt.xlabel('Sentiment')
+# plt.ylabel('Proportion')
+# plt.show()
 
-#Sentiment Histplot
-sns.histplot(trainData['sentiment'], kde=True, color='c')
-plt.show()
+# #Sentiment Histplot
+# sns.histplot(trainData['sentiment'], kde=True, color='c')
+# plt.show()
 
-#Word Frequency Distribution
-wordFreq = FreqDist(word_tokenize(' '.join(trainData['sentiment'])))
-plt.figure(figsize=(10, 6))
-wordFreq.plot(20, cumulative=False)
-plt.title("Word Frequency Distribution")
-plt.xlabel('Word')
-plt.ylabel('Frequency')
-plt.show()
+# #Word Frequency Distribution
+# wordFreq = FreqDist(word_tokenize(' '.join(trainData['sentiment'])))
+# plt.figure(figsize=(10, 6))
+# wordFreq.plot(20, cumulative=False)
+# plt.title("Word Frequency Distribution")
+# plt.xlabel('Word')
+# plt.ylabel('Frequency')
+# plt.show()
 
-#WordCloud
-text_data = ' '.join(trainData['cleanText'].dropna().astype(str))
-wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text_data)
+# #WordCloud
+# text_data = ' '.join(trainData['cleanText'].dropna().astype(str))
+# wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text_data)
 
-plt.figure(figsize=(10, 5))
-plt.imshow(wordcloud, interpolation='bilinear')
-plt.axis('off') 
-plt.title('Word Cloud for Training Data')
-plt.show()
+# plt.figure(figsize=(10, 5))
+# plt.imshow(wordcloud, interpolation='bilinear')
+# plt.axis('off') 
+# plt.title('Word Cloud for Training Data')
+# plt.show()
 
 #Model-Selection
 
@@ -166,20 +175,20 @@ yTestEnc = pd.get_dummies(yTest).values
 # print(f'Test Loss: {loss:.4f}')
 
 #MultiLayer Perception (MLP) model with RMSprop Optimizer
-model = Sequential()
-model.add(Dense(128, input_dim=XVTrain.shape[1], activation='relu'))
-model.add(Dense(64, activation='relu'))
-model.add(Dense(yTrainEnc.shape[1], activation='softmax'))
+# model = Sequential()
+# model.add(Dense(128, input_dim=XVTrain.shape[1], activation='relu'))
+# model.add(Dense(64, activation='relu'))
+# model.add(Dense(yTrainEnc.shape[1], activation='softmax'))
 
-opt = RMSprop(learning_rate=0.0001)
-model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
+# opt = RMSprop(learning_rate=0.0001)
+# model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
 
-history = model.fit(XVTrain.toarray(), yTrainEnc, epochs=5, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
+# history = model.fit(XVTrain.toarray(), yTrainEnc, epochs=5, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
 
-print("Before HyperParameter Optimization")
-loss, accuracy = model.evaluate(XVTest.toarray(), yTestEnc, verbose=1)
-print(f'Test Accuracy: {accuracy:.4f}')
-print(f'Test Loss: {loss:.4f}')
+# print("Before HyperParameter Optimization")
+# loss, accuracy = model.evaluate(XVTest.toarray(), yTestEnc, verbose=1)
+# print(f'Test Accuracy: {accuracy:.4f}')
+# print(f'Test Loss: {loss:.4f}')
 
 #Stats for Adam Optimizer Model 
 # Test Accuracy: 0.6357
@@ -222,26 +231,100 @@ def buildModel(hp):
     
     return model
 
-#setting up tuner
-tuner = kt.GridSearch(
-    buildModel,
-    objective='val_accuracy',
-    max_trials=5,
-    executions_per_trial=3,
-    directory='my_dir',
-    project_name='nlpModelTunning'
-)
+#Cross-Validation
 
-tuner.search(XVTrain, yTrainEnc, epochs=10, validation_data=(XVTest, yTestEnc))
+n = 5
+XV = vec.fit_transform(X)
+skf = StratifiedKFold(n_splits=n, shuffle=True, random_state=42)
 
-#gettingoptimal hyperparameters
-bestParas = tuner.get_best_hyperparameters(num_trials=1)[0]
+acc = []
+losses = []
 
-#building and training model model with the optimal hyperpara's
-model = tuner.hypermodel.build(bestParas)
-history = model.fit(XVTrain, yTrainEnc, epochs=6, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
+label_encoder = LabelEncoder()
+yEnc = label_encoder.fit_transform(y)
+yEnc = to_categorical(yEnc, num_classes=len(label_encoder.classes_))
 
-print("After HyperParameter Optimization")
-loss, accuracy = model.evaluate(XVTest.toarray(), yTestEnc, verbose=1)
-print(f'Test Accuracy: {accuracy:.4f}')
-print(f'Test Loss: {loss:.4f}')
+for i, j in skf.split(XV, np.argmax(yEnc, axis=1)):
+    XTrain, XTest, = XV[i], XV[j]
+    yTrain, yTest = yEnc[i], yEnc[j]
+
+    XTrain = XTrain.toarray()
+    XTest = XTest.toarray()
+
+    #setting up tuner
+    tuner = kt.GridSearch(
+        buildModel,
+        objective='val_accuracy',
+        max_trials=5,
+        executions_per_trial=3,
+        directory='my_dir',
+        project_name='nlpModelTunning'
+    )
+
+    #finding the best possible hyperparameter
+    tuner.search(XTrain, yTrain, epochs=10, validation_data=(XTest, yTest))
+
+    #stroing the params
+    bestParas = tuner.get_best_hyperparameters(num_trials=1)[0]
+
+    #building and fiting the model with the params
+    model = tuner.hypermodel.build(bestParas)
+    model.fit(XTrain, yTrain, epochs=6, batch_size=2, 
+              validation_data=(XTest, yTest), verbose=1)
+    
+    #evaluating losses and accuracies 
+    loss, accuracy = model.evaluate(XTest, yTest, verbose=1)
+    acc.append(accuracy)
+    losses.append(loss)
+
+#taking the averages
+avgAcc = np.mean(acc)
+avgLoss = np.mean(losses)
+
+print('After HyperParameter Optimization and Cross-validation')
+print(f'Average Test Accuracy: {avgAcc:.4f}')
+print(f'Average Test Loss: {avgLoss:.4f}')
+
+#Model-Interpretability
+
+#Class for preicitng probalities
+class PredictWrapper:
+    def __init__(self, model, vectorizer):
+        self.model = model
+        self.vec = vectorizer
+
+    def predict_proba(self, texts):
+        vecText = self.vec.transform(texts).toarray()
+        return self.model.predict(vecText)
+        
+
+pred = PredictWrapper(model, vec)
+
+#LIME explainer
+explainer = lime.lime_text.LimeTextExplainer(class_names=['neutral', 'positive', 'negative'])
+
+#ensuring XTest is a list of strings
+XTest = XTest if isinstance(XTest, list) else XTest.tolist()
+XTest = [str(text) for text in XTest]
+
+#instanceto explain
+idx = 15
+textInstance = XTest[idx]
+
+#ensuring the instance is a single string
+if isinstance(textInstance, list):
+    textInstance = ' '.join(textInstance)
+if isinstance(textInstance, bytes):
+    textInstance = textInstance.decode('utf-8')
+
+#Getting explaination 
+exp = explainer.explain_instance(textInstance, pred.predict_proba)
+
+#Visualizing the explaination
+try:
+    exp.show_in_notebook(text=True)
+except ModuleNotFoundError:
+    print("IPython is not installed. Skipping notebook display.")
+
+#saving into a html file
+exp.save_to_file('explaination.html')
