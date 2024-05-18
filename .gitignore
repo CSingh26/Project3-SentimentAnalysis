@@ -40,3 +40,6 @@ Thumbs.db
 
 # Ignore HTML Files
 *.html
+
+#Ignore modelTunning dir
+my_dir/
