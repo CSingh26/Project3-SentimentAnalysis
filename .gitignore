@@ -37,3 +37,6 @@ __pycache__/
 # Ignore system files
 .DS_Store
 Thumbs.db
+
+# Ignore HTML Files
+*.html

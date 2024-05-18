@@ -22,7 +22,7 @@ from keras._tf_keras.keras.utils import to_categorical
 
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix, precision_recall_curve, roc_auc_score
 
 import lime
 import lime.lime_text
@@ -48,8 +48,6 @@ else:
 # nltk.download("omw-1.4")
 
 from nltk.corpus import stopwords
-
-#TODO Evaluation-Metrics
 
 #loading trainData
 
@@ -328,3 +326,30 @@ except ModuleNotFoundError:
 
 #saving into a html file
 exp.save_to_file('explaination.html')
+
+#Evaluation Metrics
+
+#predicitons
+yPred = model.predict(XVTest.toarray())
+
+#onfusion matrix
+cm = confusion_matrix(np.argmax(yTestEnc, axis=1), np.argmax(yPred, axis=1))
+
+#plotting cm
+plt.figure(figsize=(10, 6))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.xlabel('Predicted')
+plt.ylabel('True')
+plt.title('Confusion Matrix')
+plt.show()
+
+precision, recall, thresholds = precision_recall_curve(yTestEnc.ravel(), yPred.ravel())
+plt.plot(recall, precision, marker='.')
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.title('Precision-Recall Curve')
+plt.show()
+
+#ROC-ACU
+rocAuc = roc_auc_score(yTestEnc, yPred)
+print('ROC-ACU: ', rocAuc)
