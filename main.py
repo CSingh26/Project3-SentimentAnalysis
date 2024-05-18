@@ -107,36 +107,36 @@ data.dropna(subset=['cleanText'], inplace=True)
 #EDA (train data only)
 
 #sentiment value counts
-# sentimentCounts = trainData['sentiment'].value_counts(normalize=True)
+sentimentCounts = trainData['sentiment'].value_counts(normalize=True)
 
-# plt.figure(figsize=(10, 6))
-# plt.bar(sentimentCounts.index, sentimentCounts.values)
-# plt.xlabel('Sentiment')
-# plt.ylabel('Proportion')
-# plt.show()
+plt.figure(figsize=(10, 6))
+plt.bar(sentimentCounts.index, sentimentCounts.values)
+plt.xlabel('Sentiment')
+plt.ylabel('Proportion')
+plt.show()
 
-# #Sentiment Histplot
-# sns.histplot(trainData['sentiment'], kde=True, color='c')
-# plt.show()
+#Sentiment Histplot
+sns.histplot(trainData['sentiment'], kde=True, color='c')
+plt.show()
 
-# #Word Frequency Distribution
-# wordFreq = FreqDist(word_tokenize(' '.join(trainData['sentiment'])))
-# plt.figure(figsize=(10, 6))
-# wordFreq.plot(20, cumulative=False)
-# plt.title("Word Frequency Distribution")
-# plt.xlabel('Word')
-# plt.ylabel('Frequency')
-# plt.show()
+#Word Frequency Distribution
+wordFreq = FreqDist(word_tokenize(' '.join(trainData['sentiment'])))
+plt.figure(figsize=(10, 6))
+wordFreq.plot(20, cumulative=False)
+plt.title("Word Frequency Distribution")
+plt.xlabel('Word')
+plt.ylabel('Frequency')
+plt.show()
 
-# #WordCloud
-# text_data = ' '.join(trainData['cleanText'].dropna().astype(str))
-# wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text_data)
+#WordCloud
+text_data = ' '.join(trainData['cleanText'].dropna().astype(str))
+wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text_data)
 
-# plt.figure(figsize=(10, 5))
-# plt.imshow(wordcloud, interpolation='bilinear')
-# plt.axis('off') 
-# plt.title('Word Cloud for Training Data')
-# plt.show()
+plt.figure(figsize=(10, 5))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off') 
+plt.title('Word Cloud for Training Data')
+plt.show()
 
 #Model-Selection
 
@@ -158,35 +158,35 @@ yTrainEnc = pd.get_dummies(yTrain).values
 yTestEnc = pd.get_dummies(yTest).values
 
 #MultiLayer Perception (MLP) model with Adam Optimizer
-# model = Sequential()
-# model.add(Dense(128, input_dim=XVTrain.shape[1], activation='relu'))
-# model.add(Dense(64, activation='relu'))
-# model.add(Dense(yTrainEnc.shape[1], activation='softmax'))
+model = Sequential()
+model.add(Dense(128, input_dim=XVTrain.shape[1], activation='relu'))
+model.add(Dense(64, activation='relu'))
+model.add(Dense(yTrainEnc.shape[1], activation='softmax'))
 
-# opt = Adam(learning_rate=0.0001)
-# model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
+opt = Adam(learning_rate=0.0001)
+model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
 
-# history = model.fit(XVTrain.toarray(), yTrainEnc, epochs=20, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
+history = model.fit(XVTrain.toarray(), yTrainEnc, epochs=20, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
 
-# loss, accuracy = model.evaluate(XVTest.toarray(), yTestEnc, verbose=1)
-# print(f'Test Accuracy: {accuracy:.4f}')
-# print(f'Test Loss: {loss:.4f}')
+loss, accuracy = model.evaluate(XVTest.toarray(), yTestEnc, verbose=1)
+print(f'Test Accuracy: {accuracy:.4f}')
+print(f'Test Loss: {loss:.4f}')
 
 #MultiLayer Perception (MLP) model with RMSprop Optimizer
-# model = Sequential()
-# model.add(Dense(128, input_dim=XVTrain.shape[1], activation='relu'))
-# model.add(Dense(64, activation='relu'))
-# model.add(Dense(yTrainEnc.shape[1], activation='softmax'))
+model = Sequential()
+model.add(Dense(128, input_dim=XVTrain.shape[1], activation='relu'))
+model.add(Dense(64, activation='relu'))
+model.add(Dense(yTrainEnc.shape[1], activation='softmax'))
 
-# opt = RMSprop(learning_rate=0.0001)
-# model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
+opt = RMSprop(learning_rate=0.0001)
+model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
 
-# history = model.fit(XVTrain.toarray(), yTrainEnc, epochs=5, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
+history = model.fit(XVTrain.toarray(), yTrainEnc, epochs=5, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
 
-# print("Before HyperParameter Optimization")
-# loss, accuracy = model.evaluate(XVTest.toarray(), yTestEnc, verbose=1)
-# print(f'Test Accuracy: {accuracy:.4f}')
-# print(f'Test Loss: {loss:.4f}')
+print("Before HyperParameter Optimization")
+loss, accuracy = model.evaluate(XVTest.toarray(), yTestEnc, verbose=1)
+print(f'Test Accuracy: {accuracy:.4f}')
+print(f'Test Loss: {loss:.4f}')
 
 #Stats for Adam Optimizer Model 
 # Test Accuracy: 0.6357
