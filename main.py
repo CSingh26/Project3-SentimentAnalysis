@@ -2,7 +2,6 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import string
 import ssl
 import re
 from nltk.stem import WordNetLemmatizer
@@ -16,7 +15,9 @@ from nltk.probability import FreqDist
 
 from keras._tf_keras.keras.models import Sequential
 from keras._tf_keras.keras.layers import Dense
-from keras._tf_keras.keras.optimizers import Adam, RMSprop
+from keras._tf_keras.keras.optimizers import Adam, RMSprop, SGD
+
+import keras_tuner as kt
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -37,7 +38,6 @@ else:
 
 from nltk.corpus import stopwords
 
-#TODO Hyperparameter-Tuning
 #TODO Cross-validation
 #TODO Model-Interpretability
 #TODO Evaluation-Metrics
@@ -150,7 +150,7 @@ print(score)
 yTrainEnc = pd.get_dummies(yTrain).values
 yTestEnc = pd.get_dummies(yTest).values
 
-#Dense NN model with Adam Optimizer
+#MultiLayer Perception (MLP) model with Adam Optimizer
 # model = Sequential()
 # model.add(Dense(128, input_dim=XVTrain.shape[1], activation='relu'))
 # model.add(Dense(64, activation='relu'))
@@ -165,7 +165,7 @@ yTestEnc = pd.get_dummies(yTest).values
 # print(f'Test Accuracy: {accuracy:.4f}')
 # print(f'Test Loss: {loss:.4f}')
 
-#Dense NN model with RMSprop Optimizer
+#MultiLayer Perception (MLP) model with RMSprop Optimizer
 model = Sequential()
 model.add(Dense(128, input_dim=XVTrain.shape[1], activation='relu'))
 model.add(Dense(64, activation='relu'))
@@ -174,8 +174,9 @@ model.add(Dense(yTrainEnc.shape[1], activation='softmax'))
 opt = RMSprop(learning_rate=0.0001)
 model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
 
-history = model.fit(XVTrain.toarray(), yTrainEnc, epochs=15, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
+history = model.fit(XVTrain.toarray(), yTrainEnc, epochs=5, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
 
+print("Before HyperParameter Optimization")
 loss, accuracy = model.evaluate(XVTest.toarray(), yTestEnc, verbose=1)
 print(f'Test Accuracy: {accuracy:.4f}')
 print(f'Test Loss: {loss:.4f}')
@@ -192,3 +193,55 @@ print(f'Test Loss: {loss:.4f}')
 #1 Less Training Time (24s/step)
 #2 Higher Accuracy
 #3 Lower Loss
+
+#hyperparameter optimzation
+def buildModel(hp):
+    model = Sequential()
+    model.add(Dense(
+        units=hp.Int('units_input', min_value=32, max_value=512, step=32),
+        input_dim=XVTrain.shape[1],
+        activation=hp.Choice('activation_input', values=['relu', 'tanh', 'sigmoid'])
+    ))
+    model.add(Dense(
+        units=hp.Int('units_hidden', min_value=32, max_value=512, step=32),
+        activation=hp.Choice('activation_hidden', values=['relu', 'tanh', 'sigmoid'])
+    ))
+    model.add(Dense(yTrainEnc.shape[1], activation='softmax'))
+    
+    optimizer = hp.Choice('optimizer', values=['rmsprop', 'adam', 'sgd'])
+    if optimizer == 'rmsprop':
+        opt = RMSprop(learning_rate=hp.Choice('learning_rate', values=[1e-2, 1e-3, 1e-4]))
+    elif optimizer == 'adam':
+        opt = Adam(learning_rate=hp.Choice('learning_rate', values=[1e-2, 1e-3, 1e-4]))
+    else:
+        opt = SGD(learning_rate=hp.Choice('learning_rate', values=[1e-2, 1e-3, 1e-4]))
+
+    loss = hp.Choice('loss', values=['categorical_crossentropy', 'mean_squared_error'])
+    
+    model.compile(loss=loss, optimizer=opt, metrics=['accuracy'])
+    
+    return model
+
+#setting up tuner
+tuner = kt.GridSearch(
+    buildModel,
+    objective='val_accuracy',
+    max_trials=5,
+    executions_per_trial=3,
+    directory='my_dir',
+    project_name='nlpModelTunning'
+)
+
+tuner.search(XVTrain, yTrainEnc, epochs=10, validation_data=(XVTest, yTestEnc))
+
+#gettingoptimal hyperparameters
+bestParas = tuner.get_best_hyperparameters(num_trials=1)[0]
+
+#building and training model model with the optimal hyperpara's
+model = tuner.hypermodel.build(bestParas)
+history = model.fit(XVTrain, yTrainEnc, epochs=6, batch_size=2, validation_data=(XVTest.toarray(), yTestEnc), verbose=1)
+
+print("After HyperParameter Optimization")
+loss, accuracy = model.evaluate(XVTest.toarray(), yTestEnc, verbose=1)
+print(f'Test Accuracy: {accuracy:.4f}')
+print(f'Test Loss: {loss:.4f}')
