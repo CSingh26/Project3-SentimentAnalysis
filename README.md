@@ -62,12 +62,9 @@ file or just type this command in your IDE terminal. Make sure to locate this fi
     - **Sentiment Value Counts**<br>
     This visualization helps us to understand the distribuiton of sentiment classes in the dataset. It reveals whether the dataset is balanced or not.
 
-    ![Sentiment Value Counts Graph](EDA/Figure_1.png)
-
     - **Word Frequency Distribution**<br>
     Based on the word frequencies, we can decide which words to include as features in our model. For instance, we might want to exclude very common words that are not informative.
 
-    ![Word Frequency Distribution](EDA/Figure_3.png)
         ```python
         #Word Frequency Distribution
         wordFreq = FreqDist(word_tokenize(' '.join(trainData['sentiment'])))
@@ -81,9 +78,13 @@ file or just type this command in your IDE terminal. Make sure to locate this fi
     - **Word Cloud**<br>
     Word clouds offer a quick and intuitive way to see the most prominent words in the dataset, making it easier to understand the text data at a glance.
 
-    ![Word Cloud](EDA/Figure_4.png)
-
 - **Visualization Generated from the the EDA**
+
+![Sentiment Value Counts Graph](EDA/Figure_1.png "Sentiment Value Counts Graph")
+
+![Word Frequency Distribution](EDA/Figure_3.png "Word Frequency Distribution")
+
+![Word Cloud](EDA/Figure_4.png "Word Cloud")
 
 ## Model Development
 
